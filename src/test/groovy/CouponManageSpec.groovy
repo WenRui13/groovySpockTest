@@ -1,14 +1,7 @@
-import com.jd.pop.qa.FileRwTool
 import org.apache.commons.lang3.time.DateUtils
-import org.apache.http.HttpEntity
-import org.apache.http.client.methods.CloseableHttpResponse
 import org.apache.http.client.methods.HttpGet
 import org.apache.http.client.methods.HttpPost
-import org.apache.http.impl.client.HttpClients
-import org.apache.http.util.EntityUtils
 import org.joda.time.DateTime
-import org.jsoup.Jsoup
-import org.jsoup.nodes.Document
 import spock.lang.Shared
 import spock.lang.Specification
 
@@ -18,12 +11,10 @@ import static org.apache.http.impl.client.HttpClients.createDefault
 import static org.apache.http.util.EntityUtils.toString
 import static org.jsoup.Jsoup.parse
 
-
 class CouponManageSpec extends Specification {
 
     @Shared
     String cookies = ""
-
 
     @Shared
     def client = createDefault()
@@ -36,14 +27,17 @@ class CouponManageSpec extends Specification {
     }
 
     def "恢复优惠券"() {
-        Set<String> coupons = collectCoupons(700)
-        def pin = cookies.split(";").find { it.trim().startsWith("pin") }.split("=")[1]
+        Set<String> coupons = collectCoupons(300)
+        def pin = cookies.split(";").find { it.trim().startsWith("pin=") }.split("=")[1]
         expect:
         coupons
         coupons.every { couponId ->
+            println "恢复$pin 的优惠券$couponId"
             def post = new HttpPost("https://quan.jd.com/unlock_coupon.action?pin=$pin&couponId=$couponId")
             post.setHeader("cookie", cookies)
             def response = client.execute(post)
+
+            println toString(response.entity)
             response.statusLine.statusCode == 200
         }
 
@@ -53,7 +47,7 @@ class CouponManageSpec extends Specification {
         Set<String> coupons = new HashSet<String>()
         (1..pageNum).each {
             def httpGet = new HttpGet("https://quan.jd.com/delete_quan.action?page=$it")
-
+            println "当前第$it 页……………………………………………………………………………………………………………………………………………………………………………………………………………………………………"
             httpGet.setHeader("cookie", cookies)
             def response = client.execute(httpGet)
             def entity = response.getEntity()
@@ -75,13 +69,12 @@ class CouponManageSpec extends Specification {
 
             c_msgs.eachWithIndex { String cMsg, int i ->
                 String[] msgLine = cMsg.split(" ")
-                def validEndDate = c_times[i]
-                Date date = parseDate(validEndDate, "yyyy.MM.dd");
+                def validEndDate = c_times[i].split("-")[1]
+                Date date = parseDate(validEndDate, "yyyy.MM.dd")
                 boolean isValid = DateTime.now().isBefore(date.getTime()) || DateUtils.isSameDay(DateTime.now().toDate(), date);
-                if (belongShopSet(msgLine[0], msgLine) && msgLine[1] == "全平台" && isValid) {
+                if (belongShopSet(msgLine[0], shopNames) && msgLine[1] == "全平台" && isValid) {
+                    println c_times[i] + cMsg
                     coupons.add(msgLine[2] as String)
-
-
                 }
             }
         }
