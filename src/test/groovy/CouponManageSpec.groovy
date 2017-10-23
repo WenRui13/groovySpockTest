@@ -135,7 +135,7 @@ class CouponManageSpec extends Specification {
                 String[] msgLine = cMsg.split(" ")
                 def validEndDate = c_times[j].split("-")[1]
                 Date date = parseDate(validEndDate, "yyyy.MM.dd")
-                boolean isValid = DateTime.now().isBefore(date.getTime()) || DateUtils.isSameDay(DateTime.now().toDate(), date);
+                boolean isValid = DateTime.now().isBefore(date.getTime()) || DateUtils.isSameDay(DateTime.now().toDate(), date)
                 if (belongShopSet(msgLine[0], shopNames) && msgLine[1] == "全平台" && isValid) {
                     println c_times[j] + cMsg
                     coupons.add(msgLine[2] as String)
@@ -148,7 +148,7 @@ class CouponManageSpec extends Specification {
     }
 
 
-    private boolean belongShopSet(String shopName, Set<String> shopSet) {
+    private static boolean belongShopSet(String shopName, Set<String> shopSet) {
         for (String aShopSet : shopSet) {
             if (shopName.contains(aShopSet)) {
                 return true
