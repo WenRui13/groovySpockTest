@@ -15,7 +15,6 @@ class CouponManageSpec extends Specification {
 
     @Shared
     String cookies = ""
-
     @Shared
     def client = createDefault()
 
@@ -52,6 +51,11 @@ class CouponManageSpec extends Specification {
             def response = client.execute(httpGet)
             def entity = response.getEntity()
             def document = parse(toString(entity))
+
+            if (document.title().contains("京东-欢迎登录")) {
+                println document.title()
+                throw new RuntimeException("cookie无效，请重新登录！！！")
+            }
 
             List<String> c_msgs = new ArrayList<>()
             List<String> c_times = new ArrayList<>()
