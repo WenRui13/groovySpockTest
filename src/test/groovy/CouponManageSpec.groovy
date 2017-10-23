@@ -1,3 +1,4 @@
+import org.apache.commons.lang3.StringUtils
 import org.apache.commons.lang3.time.DateUtils
 import org.apache.http.client.methods.HttpGet
 import org.apache.http.client.methods.HttpPost
@@ -28,7 +29,7 @@ class CouponManageSpec extends Specification {
     def "恢复优惠券"() {
         Set<String> coupons = collectCoupons(300)
         def pin = cookies.split(";").find { it.trim().startsWith("pin=") }.split("=")[1]
-        expect:
+        expect: "收集成功，并恢复成功"
         coupons
         coupons.every { couponId ->
             println "恢复$pin 的优惠券$couponId"
@@ -42,11 +43,32 @@ class CouponManageSpec extends Specification {
 
     }
 
-    Set<String> collectCoupons(int pageNum) {
+
+    def "删除所有coupons"() {
+        Set<String> coupons = collectAllCoupons(300)
+        def pin = cookies.split(";").find { it.trim().startsWith("pin=") }.split("=")[1]
+        expect: "收集成功，并删除成功"
+        coupons
+        coupons.each { couponId ->
+            println "删除$pin 的优惠券$couponId"
+            def post = new HttpPost("https://quan.jd.com/lock_coupon.action?pin=$pin&couponId=$couponId")
+            post.setHeader("cookie", cookies)
+            def response = client.execute(post)
+
+            println toString(response.entity)
+            response.statusLine.statusCode == 200
+
+        }
+
+    }
+
+    Set<String> collectAllCoupons(int pageNum) {
         Set<String> coupons = new HashSet<String>()
-        (1..pageNum).each {
-            def httpGet = new HttpGet("https://quan.jd.com/delete_quan.action?page=$it")
-            println "当前第$it 页……………………………………………………………………………………………………………………………………………………………………………………………………………………………………"
+
+
+        for (i in (1..pageNum)) {
+            def httpGet = new HttpGet("https://quan.jd.com/user_quan.action?couponType=-1&sort=3&page=$i")
+            println "当前第$i 页……………………………………………………………………………………………………………………………………………………………………………………………………………………………………"
             httpGet.setHeader("cookie", cookies)
             def response = client.execute(httpGet)
             def entity = response.getEntity()
@@ -56,6 +78,44 @@ class CouponManageSpec extends Specification {
                 println document.title()
                 throw new RuntimeException("cookie无效，请重新登录！！！")
             }
+
+            if (StringUtils.isBlank(document.getElementsByClass("coupon-items").text())) {
+                println "当前页面无优惠券**************"
+                return coupons
+            }
+
+            document.getElementsByClass("coupon-items").each {
+                it.getElementsByClass("c-msg").each {
+                    coupons << it.getElementsByClass("txt").text().trim().split(" ")[2]
+                }
+            }
+        }
+
+
+        return coupons
+    }
+
+    Set<String> collectCoupons(int pageNum) {
+        Set<String> coupons = new HashSet<String>()
+        for (i in (1..pageNum)) {
+            def httpGet = new HttpGet("https://quan.jd.com/delete_quan.action?page=$i")
+            println "当前第$i 页……………………………………………………………………………………………………………………………………………………………………………………………………………………………………"
+            httpGet.setHeader("cookie", cookies)
+            def response = client.execute(httpGet)
+            def entity = response.getEntity()
+            def document = parse(toString(entity))
+
+            if (document.title().contains("京东-欢迎登录")) {
+                println document.title()
+                throw new RuntimeException("cookie无效，请重新登录！！！")
+            }
+
+
+            if (StringUtils.isBlank(document.getElementsByClass("coupon-items").text())) {
+                println "当前页面无优惠券**************"
+                return coupons
+            }
+
 
             List<String> c_msgs = new ArrayList<>()
             List<String> c_times = new ArrayList<>()
@@ -71,13 +131,13 @@ class CouponManageSpec extends Specification {
             }
 
 
-            c_msgs.eachWithIndex { String cMsg, int i ->
+            c_msgs.eachWithIndex { String cMsg, int j ->
                 String[] msgLine = cMsg.split(" ")
-                def validEndDate = c_times[i].split("-")[1]
+                def validEndDate = c_times[j].split("-")[1]
                 Date date = parseDate(validEndDate, "yyyy.MM.dd")
                 boolean isValid = DateTime.now().isBefore(date.getTime()) || DateUtils.isSameDay(DateTime.now().toDate(), date);
                 if (belongShopSet(msgLine[0], shopNames) && msgLine[1] == "全平台" && isValid) {
-                    println c_times[i] + cMsg
+                    println c_times[j] + cMsg
                     coupons.add(msgLine[2] as String)
                 }
             }
