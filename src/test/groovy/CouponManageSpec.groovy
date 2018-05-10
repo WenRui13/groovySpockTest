@@ -1,4 +1,3 @@
-import org.apache.commons.lang3.StringUtils
 import org.apache.commons.lang3.time.DateUtils
 import org.apache.http.client.methods.HttpGet
 import org.apache.http.client.methods.HttpPost
@@ -16,6 +15,8 @@ class CouponManageSpec extends Specification {
 
     @Shared
     String cookies = ""
+
+
     @Shared
     def client = createDefault()
 
@@ -26,8 +27,51 @@ class CouponManageSpec extends Specification {
         shopNames = readFromFile("src/test/resources/shopName.txt")
     }
 
+
+    def "删除后恢复"() {
+        Set<String> coupons = collectAllCoupons(10000)
+        def pin = cookies.split(";").find { it.trim().startsWith("pin=") }.split("=")[1]
+
+        boolean deleteResult = true
+        if (!coupons.isEmpty()) {
+            deleteResult = coupons.every { couponId ->
+                println "删除$pin 的优惠券$couponId"
+                def post = new HttpPost("https://quan.jd.com/lock_coupon.action?pin=$pin&couponId=$couponId")
+                post.setHeader("cookie", cookies)
+                def response = client.execute(post)
+
+                println toString(response.entity)
+                response.statusLine.statusCode == 200
+
+            }
+
+        }
+
+        expect:
+        deleteResult
+        when:
+        coupons = collectCoupons(1000)
+
+        then:
+
+        coupons
+
+        coupons.every { couponId ->
+            println "恢复$pin 的优惠券$couponId"
+            def post = new HttpPost("https://quan.jd.com/unlock_coupon.action?pin=$pin&couponId=$couponId")
+            post.setHeader("cookie", cookies)
+            def response = client.execute(post)
+
+            println toString(response.entity)
+            response.statusLine.statusCode == 200
+        }
+
+
+    }
+
+
     def "恢复优惠券"() {
-        Set<String> coupons = collectCoupons(300)
+        Set<String> coupons = collectCoupons(1000)
         def pin = cookies.split(";").find { it.trim().startsWith("pin=") }.split("=")[1]
         expect: "收集成功，并恢复成功"
         coupons
@@ -45,11 +89,11 @@ class CouponManageSpec extends Specification {
 
 
     def "删除所有coupons"() {
-        Set<String> coupons = collectAllCoupons(300)
+        Set<String> coupons = collectAllCoupons(10000)
         def pin = cookies.split(";").find { it.trim().startsWith("pin=") }.split("=")[1]
         expect: "收集成功，并删除成功"
         coupons
-        coupons.each { couponId ->
+        coupons.every { couponId ->
             println "删除$pin 的优惠券$couponId"
             def post = new HttpPost("https://quan.jd.com/lock_coupon.action?pin=$pin&couponId=$couponId")
             post.setHeader("cookie", cookies)
@@ -79,9 +123,15 @@ class CouponManageSpec extends Specification {
                 throw new RuntimeException("cookie无效，请重新登录！！！")
             }
 
-            if (StringUtils.isBlank(document.getElementsByClass("coupon-items").text())) {
+//            if (StringUtils.isBlank(document.getElementsByClass("coupon-items").text())) {
+//                println "当前页面无优惠券**************"
+//                return coupons
+//            }
+
+            if (!document.getElementsByClass("coupon-items").hasText()) {
                 println "当前页面无优惠券**************"
                 return coupons
+
             }
 
             document.getElementsByClass("coupon-items").each {
@@ -110,33 +160,37 @@ class CouponManageSpec extends Specification {
                 throw new RuntimeException("cookie无效，请重新登录！！！")
             }
 
+//            if (StringUtils.isBlank(document.getElementsByClass("coupon-items").text())) {
+//                println "当前页面无优惠券**************"
+//                return coupons
+//            }
 
-            if (StringUtils.isBlank(document.getElementsByClass("coupon-items").text())) {
+            if (!document.getElementsByClass("coupon-items").hasText()) {
                 println "当前页面无优惠券**************"
                 return coupons
+
             }
 
 
             List<String> c_msgs = new ArrayList<>()
             List<String> c_times = new ArrayList<>()
 
-            document.getElementsByClass("coupon-item coupon-item-j ").each {
-                it.getElementsByClass("c-msg").each {
+            document.getElementsByClass("coupon-item").each {
+                if (it.attributes().get("class").contains("coupon-item-j")
+                        || it.attributes().get("class").contains("coupon-item-myf")) {
+
                     c_msgs << it.getElementsByClass("txt").text().trim()
+                    c_times << it.getElementsByClass("c-time").text().trim()
                 }
-            }
 
-            document.getElementsByClass("coupon-item coupon-item-j ").each {
-                c_times << it.getElementsByClass("c-time").text().trim()
             }
-
 
             c_msgs.eachWithIndex { String cMsg, int j ->
-                String[] msgLine = cMsg.split(" ")
-                def validEndDate = c_times[j].split("-")[1]
+                String[] msgLine = cMsg.split("\\s+")
+                String validEndDate = c_times[j].replaceAll(".*-", "")
                 Date date = parseDate(validEndDate, "yyyy.MM.dd")
                 boolean isValid = DateTime.now().isBefore(date.getTime()) || DateUtils.isSameDay(DateTime.now().toDate(), date)
-                if (belongShopSet(msgLine[0], shopNames) && msgLine[1] == "全平台" && isValid) {
+                if (msgLine[1] == "全平台" && isValid && (belongShopSet(msgLine[0], shopNames) || msgLine[0].contains("部分"))) {
                     println c_times[j] + cMsg
                     coupons.add(msgLine[2] as String)
                 }
