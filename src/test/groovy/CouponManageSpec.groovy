@@ -5,6 +5,8 @@ import org.joda.time.DateTime
 import spock.lang.Shared
 import spock.lang.Specification
 
+import java.util.regex.Pattern
+
 import static com.jd.pop.qa.FileRwTool.readFromFile
 import static org.apache.commons.lang3.time.DateUtils.parseDate
 import static org.apache.http.impl.client.HttpClients.createDefault
@@ -30,7 +32,11 @@ class CouponManageSpec extends Specification {
 
     def "删除后恢复"() {
         Set<String> coupons = collectAllCoupons(10000)
-        def pin = cookies.split(";").find { it.trim().startsWith("pin=") }.split("=")[1]
+
+        def pattern = Pattern.compile("(pin=)(.*?)(;)")
+        def matcher = pattern.matcher(cookies)
+
+        def pin = matcher.find() ? matcher.group(2) : null
 
         boolean deleteResult = true
         if (!coupons.isEmpty()) {
