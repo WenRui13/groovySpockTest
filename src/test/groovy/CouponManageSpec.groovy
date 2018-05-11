@@ -18,7 +18,6 @@ class CouponManageSpec extends Specification {
     @Shared
     String cookies = ""
 
-
     @Shared
     def client = createDefault()
 
@@ -32,56 +31,54 @@ class CouponManageSpec extends Specification {
 
     def "删除后恢复"() {
         Set<String> coupons = collectAllCoupons(10000)
-
-        def pattern = Pattern.compile("pin=(.*?);")
-        def matcher = pattern.matcher(cookies)
-
-        def pin = matcher.find() ? matcher.group(1) : null
-
-        boolean deleteResult = true
-        if (!coupons.isEmpty()) {
-            deleteResult = coupons.every { couponId ->
-                println "删除$pin 的优惠券$couponId"
-                def post = new HttpPost("https://quan.jd.com/lock_coupon.action?pin=$pin&couponId=$couponId")
-                post.setHeader("cookie", cookies)
-                def response = client.execute(post)
-
-                println toString(response.entity)
-                response.statusLine.statusCode == 200
-
-            }
-
-        }
+        String pin = getPinFromCookies(cookies)
+        boolean deleteResult = coupons.isEmpty() ? true : executeDelete(coupons, pin)
 
         expect:
         deleteResult
+
         when:
-        coupons = collectCoupons(1000)
+        coupons = collectCoupons(200)
 
         then:
-
         coupons
+        executeRecover(coupons, pin)
 
-        coupons.every { couponId ->
-            println "恢复$pin 的优惠券$couponId"
-            def post = new HttpPost("https://quan.jd.com/unlock_coupon.action?pin=$pin&couponId=$couponId")
-            post.setHeader("cookie", cookies)
-            def response = client.execute(post)
 
-            println toString(response.entity)
-            response.statusLine.statusCode == 200
-        }
+    }
 
+    def "删除所有coupons"() {
+        Set<String> coupons = collectAllCoupons(10000)
+        String pin = getPinFromCookies(cookies)
+
+        expect: "收集成功，并删除成功"
+        coupons
+        executeDelete(coupons, pin)
 
     }
 
 
     def "恢复优惠券"() {
         Set<String> coupons = collectCoupons(1000)
-        def pin = cookies.split(";").find { it.trim().startsWith("pin=") }.split("=")[1]
+        String pin = getPinFromCookies(cookies)
+
         expect: "收集成功，并恢复成功"
         coupons
-        coupons.every { couponId ->
+        executeRecover(coupons, pin)
+
+    }
+
+    private static getPinFromCookies(String cookies) {
+        def pattern = Pattern.compile("pin=(.*?);")
+        def matcher = pattern.matcher(cookies)
+
+        def pin = matcher.find() ? matcher.group(1) : null
+        return pin
+    }
+
+
+    private executeRecover(Set<String> coupons, pin) {
+        return coupons.every { couponId ->
             println "恢复$pin 的优惠券$couponId"
             def post = new HttpPost("https://quan.jd.com/unlock_coupon.action?pin=$pin&couponId=$couponId")
             post.setHeader("cookie", cookies)
@@ -90,16 +87,10 @@ class CouponManageSpec extends Specification {
             println toString(response.entity)
             response.statusLine.statusCode == 200
         }
-
     }
 
-
-    def "删除所有coupons"() {
-        Set<String> coupons = collectAllCoupons(10000)
-        def pin = cookies.split(";").find { it.trim().startsWith("pin=") }.split("=")[1]
-        expect: "收集成功，并删除成功"
-        coupons
-        coupons.every { couponId ->
+    private executeDelete(Set<String> coupons, pin) {
+        return coupons.every { couponId ->
             println "删除$pin 的优惠券$couponId"
             def post = new HttpPost("https://quan.jd.com/lock_coupon.action?pin=$pin&couponId=$couponId")
             post.setHeader("cookie", cookies)
@@ -109,13 +100,10 @@ class CouponManageSpec extends Specification {
             response.statusLine.statusCode == 200
 
         }
-
     }
 
     Set<String> collectAllCoupons(int pageNum) {
         Set<String> coupons = new HashSet<String>()
-
-
         for (i in (1..pageNum)) {
             def httpGet = new HttpGet("https://quan.jd.com/user_quan.action?couponType=-1&sort=3&page=$i")
             println "当前第$i 页……………………………………………………………………………………………………………………………………………………………………………………………………………………………………"
@@ -129,10 +117,6 @@ class CouponManageSpec extends Specification {
                 throw new RuntimeException("cookie无效，请重新登录！！！")
             }
 
-//            if (StringUtils.isBlank(document.getElementsByClass("coupon-items").text())) {
-//                println "当前页面无优惠券**************"
-//                return coupons
-//            }
 
             if (document.getElementsByClass("coupon-item").isEmpty()) {
                 println "当前页面无优惠券**************"
@@ -140,10 +124,8 @@ class CouponManageSpec extends Specification {
 
             }
 
-            document.getElementsByClass("coupon-items").each {
-                it.getElementsByClass("c-msg").each {
-                    coupons << it.getElementsByClass("txt").text().trim().split(" ")[2]
-                }
+            document.getElementsByClass("coupon-item").each {
+                coupons << it.getElementsByClass("txt").text().replaceAll("\\D+", "")
             }
         }
 
@@ -166,10 +148,6 @@ class CouponManageSpec extends Specification {
                 throw new RuntimeException("cookie无效，请重新登录！！！")
             }
 
-//            if (StringUtils.isBlank(document.getElementsByClass("coupon-items").text())) {
-//                println "当前页面无优惠券**************"
-//                return coupons
-//            }
 
             if (document.getElementsByClass("coupon-item").isEmpty()) {
                 println "当前页面无优惠券**************"
