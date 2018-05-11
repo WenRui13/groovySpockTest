@@ -126,7 +126,7 @@ class CouponManageSpec extends Specification {
             }
 
             document.getElementsByClass("coupon-item").each {
-                coupons << it.getElementsByClass("txt").text().replaceAll("\\D+", "")
+                coupons << it.getElementsByClass("txt").text().trim().split("\\s+")[2]
             }
         }
 
