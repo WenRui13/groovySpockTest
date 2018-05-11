@@ -33,10 +33,10 @@ class CouponManageSpec extends Specification {
     def "删除后恢复"() {
         Set<String> coupons = collectAllCoupons(10000)
 
-        def pattern = Pattern.compile("(pin=)(.*?)(;)")
+        def pattern = Pattern.compile("pin=(.*?);")
         def matcher = pattern.matcher(cookies)
 
-        def pin = matcher.find() ? matcher.group(2) : null
+        def pin = matcher.find() ? matcher.group(1) : null
 
         boolean deleteResult = true
         if (!coupons.isEmpty()) {
