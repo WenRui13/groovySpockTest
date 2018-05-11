@@ -5,6 +5,7 @@ import org.joda.time.DateTime
 import spock.lang.Shared
 import spock.lang.Specification
 
+import java.util.regex.Matcher
 import java.util.regex.Pattern
 
 import static com.jd.pop.qa.FileRwTool.readFromFile
@@ -68,11 +69,11 @@ class CouponManageSpec extends Specification {
 
     }
 
-    private static getPinFromCookies(String cookies) {
-        def pattern = Pattern.compile("pin=(.*?);")
-        def matcher = pattern.matcher(cookies)
+    private static String getPinFromCookies(String cookies) {
+        Pattern pattern = Pattern.compile("pin=(.*?);")
+        Matcher matcher = pattern.matcher(cookies)
 
-        def pin = matcher.find() ? matcher.group(1) : null
+        String pin = matcher.find() ? matcher.group(1) : null
         return pin
     }
 
