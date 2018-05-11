@@ -134,7 +134,7 @@ class CouponManageSpec extends Specification {
 //                return coupons
 //            }
 
-            if (!document.getElementsByClass("coupon-items").hasText()) {
+            if (document.getElementsByClass("coupon-item").isEmpty()) {
                 println "当前页面无优惠券**************"
                 return coupons
 
@@ -171,7 +171,7 @@ class CouponManageSpec extends Specification {
 //                return coupons
 //            }
 
-            if (!document.getElementsByClass("coupon-items").hasText()) {
+            if (document.getElementsByClass("coupon-item").isEmpty()) {
                 println "当前页面无优惠券**************"
                 return coupons
 
