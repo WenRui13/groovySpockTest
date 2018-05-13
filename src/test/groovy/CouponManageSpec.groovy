@@ -39,7 +39,7 @@ class CouponManageSpec extends Specification {
         deleteResult
 
         when:
-        coupons = collectCoupons(200)
+        coupons = collectCoupons(1000)
 
         then:
         coupons
