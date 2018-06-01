@@ -70,7 +70,8 @@ class CouponManageSpec extends Specification {
     }
 
     private static String getPinFromCookies(String cookies) {
-        Pattern pattern = Pattern.compile("pin=(.*?);")
+        Pattern pattern = Pattern.compile(";\\s*pin=(.*?);")
+//        Pattern pattern = Pattern.compile("\\Wpin=(.*?);")
         Matcher matcher = pattern.matcher(cookies)
 
         String pin = matcher.find() ? matcher.group(1) : null
