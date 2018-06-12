@@ -25,6 +25,10 @@ class CouponManageSpec extends Specification {
     @Shared
     Set<String> shopNames
 
+    @Shared
+    Map<String, Integer> couponPriceMap = new HashMap()
+
+
     def setup() {
         shopNames = readFromFile("src/test/resources/shopName.txt")
     }
@@ -39,11 +43,14 @@ class CouponManageSpec extends Specification {
         deleteResult
 
         when:
-        coupons = collectCoupons(1000)
+        coupons = collectCoupons(2000)
 
         then:
         coupons
         executeRecover(coupons, pin)
+
+        println "there are " + coupons.size() + " coupons have been recoved successfully."
+        couponPriceMap.each { entry -> println entry.key + "，优惠共计${entry.value}元" }
 
 
     }
@@ -66,6 +73,10 @@ class CouponManageSpec extends Specification {
         expect: "收集成功，并恢复成功"
         coupons
         executeRecover(coupons, pin)
+
+        println "there are " + coupons.size() + " coupons have been recoved successfully."
+        couponPriceMap.each { entry -> println entry.key + "，优惠共计${entry.value}元" }
+
 
     }
 
@@ -160,6 +171,7 @@ class CouponManageSpec extends Specification {
 
             List<String> c_msgs = new ArrayList<>()
             List<String> c_times = new ArrayList<>()
+            List<String> c_prices = new ArrayList<>()
 
             document.getElementsByClass("coupon-item").each {
                 if (it.attributes().get("class").contains("coupon-item-j")
@@ -167,18 +179,27 @@ class CouponManageSpec extends Specification {
 
                     c_msgs << it.getElementsByClass("txt").text().trim()
                     c_times << it.getElementsByClass("c-time").text().trim()
+                    c_prices << it.getElementsByClass("c-price").text().trim()
                 }
 
             }
 
             c_msgs.eachWithIndex { String cMsg, int j ->
                 String[] msgLine = cMsg.split("\\s+")
+//                String[] priceInfo = c_prices[j].split("\\s+")
+
+                String couponPrice = c_prices[j].replaceAll("\\D", "")
                 String validEndDate = c_times[j].replaceAll(".*-", "")
                 Date date = parseDate(validEndDate, "yyyy.MM.dd")
                 boolean isValid = DateTime.now().isBefore(date.getTime()) || DateUtils.isSameDay(DateTime.now().toDate(), date)
                 if (msgLine[1] == "全平台" && isValid && (belongShopSet(msgLine[0], shopNames) || msgLine[0].contains("部分"))) {
                     println c_times[j] + cMsg
                     coupons.add(msgLine[2] as String)
+                    def totalPrice = couponPriceMap.containsKey(msgLine[0]) ? couponPriceMap.get(msgLine[0]) + Integer.valueOf(couponPrice) : Integer.valueOf(couponPrice)
+                    couponPriceMap.put(msgLine[0], totalPrice)
+                    if (coupons.size() > 200) {
+                        throw new Exception("the number of coupons to be recoved will be greater than 200")
+                    }
                 }
             }
         }
