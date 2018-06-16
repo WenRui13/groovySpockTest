@@ -43,7 +43,7 @@ class CouponManageSpec extends Specification {
         deleteResult
 
         when:
-        coupons = collectRecoverableCoupons(70,2000)
+        coupons = collectRecoverableCoupons(70, 2000)
 
         then:
         coupons
@@ -60,7 +60,7 @@ class CouponManageSpec extends Specification {
         deleteResult
 
         when:
-        coupons = collectRecoverableCoupons(100,1000)
+        coupons = collectRecoverableCoupons(100, 1000)
 
         then:
         coupons
@@ -71,6 +71,7 @@ class CouponManageSpec extends Specification {
 
 
     }
+
     def "删除后恢复"() {
         Set<String> coupons = collectCoupons2delete(10000)
         String pin = getPinFromCookies(cookies)
@@ -201,6 +202,7 @@ class CouponManageSpec extends Specification {
 
             if (document.getElementsByClass("coupon-item").isEmpty()) {
                 println "当前页面无优惠券**************"
+                couponPriceMap = couponPriceMap.sort { a, b -> b.value <=> a.value }
                 return coupons
 
             }
@@ -240,6 +242,8 @@ class CouponManageSpec extends Specification {
                 }
             }
         }
+
+        couponPriceMap = couponPriceMap.sort { a, b -> b.value <=> a.value }
 
 
         return coupons
