@@ -326,8 +326,8 @@ class CouponManageSpec extends Specification {
 
 
     private static boolean belongShopSet(String shopName, Set<String> shopSet) {
-        for (String aShopSet : shopSet) {
-            if (shopName.contains(aShopSet)) {
+        for (String aShopFromSet : shopSet) {
+            if (aShopFromSet.contains(shopName)||shopName.contains(aShopFromSet)) {
                 return true
             }
 
