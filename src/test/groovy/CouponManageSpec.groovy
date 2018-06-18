@@ -27,6 +27,8 @@ class CouponManageSpec extends Specification {
 
     @Shared
     Map<String, Integer> couponPriceMap = new HashMap()
+    @Shared
+    def couponTypes = [0: "coupon-item-j", 1: "coupon-item-d"]
 
 
     def setup() {
@@ -184,7 +186,7 @@ class CouponManageSpec extends Specification {
         return coupons
     }
 
-    Set<String> collectCoupons2recover(int pageNum) {
+    Set<String> collectCoupons2recover(int pageNum, int typeKey = 0) {
         Set<String> coupons = new HashSet<String>()
         for (i in (1..pageNum)) {
             def httpGet = new HttpGet("https://quan.jd.com/delete_quan.action?page=$i")
@@ -213,7 +215,7 @@ class CouponManageSpec extends Specification {
             List<String> c_prices = new ArrayList<>()
 
             document.getElementsByClass("coupon-item").each {
-                if (it.attributes().get("class").contains("coupon-item-j")
+                if (it.attributes().get("class").contains(couponTypes.get(typeKey, "coupon-item-j"))
                         || it.attributes().get("class").contains("coupon-item-myf")) {
 
                     c_msgs << it.getElementsByClass("txt").text().trim()
@@ -327,7 +329,7 @@ class CouponManageSpec extends Specification {
 
     private static boolean belongShopSet(String shopName, Set<String> shopSet) {
         for (String aShopFromSet : shopSet) {
-            if (aShopFromSet.contains(shopName)||shopName.contains(aShopFromSet)) {
+            if (aShopFromSet.contains(shopName) || shopName.contains(aShopFromSet)) {
                 return true
             }
 
