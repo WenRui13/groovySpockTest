@@ -1,4 +1,5 @@
 import org.apache.commons.lang3.time.DateUtils
+import org.apache.http.HttpEntity
 import org.apache.http.client.methods.HttpGet
 import org.apache.http.client.methods.HttpPost
 import org.joda.time.DateTime
@@ -45,7 +46,7 @@ class CouponManageSpec extends Specification {
         deleteResult
 
         when:
-        coupons = collectRecoverableCoupons(70, 2000)
+        coupons = collectRecoverableCoupons(70, 2500)
 
         then:
         coupons
@@ -147,10 +148,14 @@ class CouponManageSpec extends Specification {
             println "删除$pin 的优惠券$couponId"
             def post = new HttpPost("https://quan.jd.com/lock_coupon.action?pin=$pin&couponId=$couponId")
             post.setHeader("cookie", cookies)
-            def response = client.execute(post)
+            try {
+                def response = client.execute(post)
+                println toString(response.entity)
+                response.statusLine.statusCode == 200
+            } catch (SocketException ignored) {
+                return executeDelete(coupons, pin)
+            }
 
-            println toString(response.entity)
-            response.statusLine.statusCode == 200
 
         }
     }
@@ -188,67 +193,136 @@ class CouponManageSpec extends Specification {
 
     Set<String> collectCoupons2recover(int pageNum, int typeKey = 0) {
         Set<String> coupons = new HashSet<String>()
-        for (i in (1..pageNum)) {
-            def httpGet = new HttpGet("https://quan.jd.com/delete_quan.action?page=$i")
-            println "当前第$i 页……………………………………………………………………………………………………………………………………………………………………………………………………………………………………"
-            httpGet.setHeader("cookie", cookies)
-            def response = client.execute(httpGet)
-            def entity = response.getEntity()
-            def document = parse(toString(entity))
-
-            if (document.title().contains("京东-欢迎登录")) {
-                println document.title()
-                throw new RuntimeException("cookie无效，请重新登录！！！")
-            }
 
 
-            if (document.getElementsByClass("coupon-item").isEmpty()) {
-                println "当前页面无优惠券**************"
-                couponPriceMap = couponPriceMap.sort { a, b -> b.value <=> a.value }
-                return coupons
-
-            }
-
-
-            List<String> c_msgs = new ArrayList<>()
-            List<String> c_times = new ArrayList<>()
-            List<String> c_prices = new ArrayList<>()
-
-            document.getElementsByClass("coupon-item").each {
-                if (it.attributes().get("class").contains(couponTypes.get(typeKey, "coupon-item-j"))
-                        || it.attributes().get("class").contains("coupon-item-myf")) {
-
-                    c_msgs << it.getElementsByClass("txt").text().trim()
-                    c_times << it.getElementsByClass("c-time").text().trim()
-                    c_prices << it.getElementsByClass("c-price").text().trim()
-                }
-
-            }
-
-            c_msgs.eachWithIndex { String cMsg, int j ->
-                String[] msgLine = cMsg.split("\\s+")
-//                String[] priceInfo = c_prices[j].split("\\s+")
-
-                String couponPrice = c_prices[j].replaceAll("\\D", "")
-                String validEndDate = c_times[j].replaceAll(".*-", "")
-                Date date = parseDate(validEndDate, "yyyy.MM.dd")
-                boolean isValid = DateTime.now().isBefore(date.getTime()) || DateUtils.isSameDay(DateTime.now().toDate(), date)
-                if (msgLine[1] == "全平台" && isValid && (belongShopSet(msgLine[0], shopNames) || msgLine[0].contains("部分"))) {
-                    println c_times[j] + cMsg
-                    coupons.add(msgLine[2] as String)
-                    def totalPrice = couponPriceMap.containsKey(msgLine[0]) ? couponPriceMap.get(msgLine[0]) + Integer.valueOf(couponPrice) : Integer.valueOf(couponPrice)
-                    couponPriceMap.put(msgLine[0], totalPrice)
-                    if (coupons.size() > 200) {
-                        throw new Exception("the number of coupons to be recoved will be greater than 200")
-                    }
-                }
-            }
-        }
+        loopFindCoupons2recover(coupons, pageNum, typeKey)
+//        for (i in (1..pageNum)) {
+//            def httpGet = new HttpGet("https://quan.jd.com/delete_quan.action?page=$i")
+//            println "当前第$i 页……………………………………………………………………………………………………………………………………………………………………………………………………………………………………"
+//            httpGet.setHeader("cookie", cookies)
+//            def response = client.execute(httpGet)
+//            def entity = response.getEntity()
+//            def document = parse(toString(entity))
+//
+//            if (document.title().contains("京东-欢迎登录")) {
+//                println document.title()
+//                throw new RuntimeException("cookie无效，请重新登录！！！")
+//            }
+//
+//
+//            if (document.getElementsByClass("coupon-item").isEmpty()) {
+//                println "当前页面无优惠券**************"
+//                couponPriceMap = couponPriceMap.sort { a, b -> b.value <=> a.value }
+//                return coupons
+//
+//            }
+//
+//
+//            List<String> c_msgs = new ArrayList<>()
+//            List<String> c_times = new ArrayList<>()
+//            List<String> c_prices = new ArrayList<>()
+//
+//            document.getElementsByClass("coupon-item").each {
+//                if (it.attributes().get("class").contains(couponTypes.get(typeKey, "coupon-item-j"))
+//                        || it.attributes().get("class").contains("coupon-item-myf")) {
+//
+//                    c_msgs << it.getElementsByClass("txt").text().trim()
+//                    c_times << it.getElementsByClass("c-time").text().trim()
+//                    c_prices << it.getElementsByClass("c-price").text().trim()
+//                }
+//
+//            }
+//
+//            c_msgs.eachWithIndex { String cMsg, int j ->
+//                String[] msgLine = cMsg.split("\\s+")
+////                String[] priceInfo = c_prices[j].split("\\s+")
+//
+//                String couponPrice = c_prices[j].replaceAll("\\D", "")
+//                String validEndDate = c_times[j].replaceAll(".*-", "")
+//                Date date = parseDate(validEndDate, "yyyy.MM.dd")
+//                boolean isValid = DateTime.now().isBefore(date.getTime()) || DateUtils.isSameDay(DateTime.now().toDate(), date)
+//                if (msgLine[1] == "全平台" && isValid && (belongShopSet(msgLine[0], shopNames) || msgLine[0].contains("部分"))) {
+//                    println c_times[j] + cMsg
+//                    coupons.add(msgLine[2] as String)
+//                    def totalPrice = couponPriceMap.containsKey(msgLine[0]) ? couponPriceMap.get(msgLine[0]) + Integer.valueOf(couponPrice) : Integer.valueOf(couponPrice)
+//                    couponPriceMap.put(msgLine[0], totalPrice)
+//                    if (coupons.size() > 200) {
+//                        throw new Exception("the number of coupons to be recoved will be greater than 200")
+//                    }
+//                }
+//            }
+//        }
 
         couponPriceMap = couponPriceMap.sort { a, b -> b.value <=> a.value }
 
 
         return coupons
+    }
+
+    def loopFindCoupons2recover(HashSet<String> coupons, int pageNum, int typeKey, int startPageNum = 1) {
+
+        for (i in (startPageNum..pageNum)) {
+            def httpGet = new HttpGet("https://quan.jd.com/delete_quan.action?page=$i")
+            println "当前第$i 页……………………………………………………………………………………………………………………………………………………………………………………………………………………………………"
+            httpGet.setHeader("cookie", cookies)
+            try {
+                def response = client.execute(httpGet)
+                HttpEntity entity = response.getEntity()
+                def document = parse(toString(entity))
+
+                if (document.title().contains("京东-欢迎登录")) {
+                    println document.title()
+                    throw new RuntimeException("cookie无效，请重新登录！！！")
+                }
+
+
+                if (document.getElementsByClass("coupon-item").isEmpty()) {
+                    println "当前页面无优惠券**************"
+                    couponPriceMap = couponPriceMap.sort { a, b -> b.value <=> a.value }
+                    break
+
+                }
+
+
+                List<String> c_msgs = new ArrayList<>()
+                List<String> c_times = new ArrayList<>()
+                List<String> c_prices = new ArrayList<>()
+
+                document.getElementsByClass("coupon-item").each {
+                    if (it.attributes().get("class").contains(couponTypes.get(typeKey, "coupon-item-j"))
+                            || it.attributes().get("class").contains("coupon-item-myf")) {
+
+                        c_msgs << it.getElementsByClass("txt").text().trim()
+                        c_times << it.getElementsByClass("c-time").text().trim()
+                        c_prices << it.getElementsByClass("c-price").text().trim()
+                    }
+
+                }
+
+                c_msgs.eachWithIndex { String cMsg, int j ->
+                    String[] msgLine = cMsg.split("\\s+")
+//                String[] priceInfo = c_prices[j].split("\\s+")
+
+                    String couponPrice = c_prices[j].replaceAll("\\D", "")
+                    String validEndDate = c_times[j].replaceAll(".*-", "")
+                    Date date = parseDate(validEndDate, "yyyy.MM.dd")
+                    boolean isValid = DateTime.now().isBefore(date.getTime()) || DateUtils.isSameDay(DateTime.now().toDate(), date)
+                    if (msgLine[1] == "全平台" && isValid && (belongShopSet(msgLine[0], shopNames) || msgLine[0].contains("部分"))) {
+                        println c_times[j] + cMsg
+                        coupons.add(msgLine[2] as String)
+                        def totalPrice = couponPriceMap.containsKey(msgLine[0]) ? couponPriceMap.get(msgLine[0]) + Integer.valueOf(couponPrice) : Integer.valueOf(couponPrice)
+                        couponPriceMap.put(msgLine[0], totalPrice)
+                        if (coupons.size() > 200) {
+                            throw new Exception("the number of coupons to be recoved will be greater than 200")
+                        }
+                    }
+                }
+            } catch (SocketException ignored) {
+                loopFindCoupons2recover(coupons, pageNum, typeKey, i)
+                break
+            }
+        }
+
     }
 
     Set<String> collectRecoverableCoupons(int threshold, int pageNum) {
@@ -277,7 +351,7 @@ class CouponManageSpec extends Specification {
 
 
             List<String> c_msgs = new ArrayList<>()
-            List<String> c_times = new ArrayList<>()
+            List<String> c_dates = new ArrayList<>()
             List<String> c_prices = new ArrayList<>()
 
             document.getElementsByClass("coupon-item").each {
@@ -285,7 +359,7 @@ class CouponManageSpec extends Specification {
                         || it.attributes().get("class").contains("coupon-item-myf")) {
 
                     c_msgs << it.getElementsByClass("txt").text().trim()
-                    c_times << it.getElementsByClass("c-time").text().trim()
+                    c_dates << it.getElementsByClass("c-time").text().trim()
                     c_prices << it.getElementsByClass("c-price").text().trim()
                 }
 
@@ -296,11 +370,11 @@ class CouponManageSpec extends Specification {
 //                String[] priceInfo = c_prices[j].split("\\s+")
 
                 String couponPrice = c_prices[j].replaceAll("\\D", "")
-                String validEndDate = c_times[j].replaceAll(".*-", "")
-                Date date = parseDate(validEndDate, "yyyy.MM.dd")
-                boolean isValid = DateTime.now().isBefore(date.getTime()) || DateUtils.isSameDay(DateTime.now().toDate(), date)
+                String validEndDate = c_dates[j].replaceAll(".*-", "")
+                Date endDate = parseDate(validEndDate, "yyyy.MM.dd")
+                boolean isValid = DateTime.now().isBefore(endDate.getTime()) || DateUtils.isSameDay(DateTime.now().toDate(), endDate)
                 if (msgLine[1] == "全平台" && isValid) {
-                    println c_times[j] + cMsg
+                    println c_dates[j] + cMsg
 //                    coupons.add(msgLine[2] as String)
 
                     def shopCoupons = shopCouponsMap.containsKey(msgLine[0]) ? shopCouponsMap.get(msgLine[0]) << msgLine[2] : [msgLine[2]]
